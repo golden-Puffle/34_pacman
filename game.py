@@ -28,20 +28,55 @@ PLAYER_START = (11, 10)
 FRIGHT_SECONDS = 3.0
 PLAYER_STEP, GHOST_STEP = 0.14, 0.17
 
+FRIGHTENED_TINTS = {
+    "blinky": (140, 60, 230),   # violet
+    "pinky":  (60, 200, 110),   # green
+    "inky":   (30, 140, 255),   # bright blue
+    "clyde":  (230, 80, 160),   # magenta
+}
 
 def ghost_color(name, mode):
     """Return an (r, g, b) colour override for a ghost, or None to keep the default."""
-    pass
+    if mode == "frightened":
+        return FRIGHTENED_TINTS.get(name)
+    return None
+
+
+HUD_FLASH_MS = 2000        # how long the HUD flashes after the last pellet
+HUD_BLINK_MS = 150         # blink speed
+HUD_BASE_COLOR = (240, 240, 240)
+HUD_FLASH_COLOR = (255, 220, 20)
+
+hud_flash_start = None     # tick time when the last pellet was eaten
 
 
 def on_pellet_eaten(score, pellets_left):
-    """Called after every pellet is eaten; add sound, flashes, or bonus fruit here."""
-    pass
+    """Called after every pellet is eaten; starts the HUD flash on the final pellet."""
+    global hud_flash_start
+    if pellets_left == 0:
+        hud_flash_start = pygame.time.get_ticks()
 
+
+def clear_hud_flash():
+    global hud_flash_start
+    hud_flash_start = None
+
+
+def hud_color():
+    """Colour for the HUD text this frame (alternates while flashing)."""
+    if hud_flash_start is None:
+        return HUD_BASE_COLOR
+    elapsed = pygame.time.get_ticks() - hud_flash_start
+    if elapsed < HUD_FLASH_MS and (elapsed // HUD_BLINK_MS) % 2 == 0:
+        return HUD_FLASH_COLOR
+    return HUD_BASE_COLOR
+
+
+BONUS_LIFE_SCORE = 1000
 
 def bonus_life_threshold():
     """Return a score value at which the player earns an extra life, or None to disable bonus lives."""
-    pass
+    return BONUS_LIFE_SCORE
 
 
 def is_wall(cell):
@@ -130,6 +165,7 @@ class Game:
         self.score, self.lives, self.state = 0, 3, "play"
         self.bonus_awarded = 0
         self.clock_time = self.fright_left = self.player_acc = self.ghost_acc = 0.0
+        clear_hud_flash()    # added this
         for ghost in self.ghosts:
             ghost.reset()
 
@@ -157,7 +193,7 @@ class Game:
             return
         self.pellets.remove(cell)
         self.score += 10
-        if MAZE[cell[0]][cell[1]] == "O":
+        if MAZE[cell[0]][cell[1]] == "o":      # was "O"
             self.score += 40
             self.fright_left = FRIGHT_SECONDS
             for ghost in self.ghosts:
@@ -240,7 +276,7 @@ class Game:
                 pygame.draw.rect(screen, color, (gx - TILE // 2 + 3, gy - 2, TILE - 6, TILE // 2 - 2))
                 pygame.draw.circle(screen, (255, 255, 255), (gx - 4, gy - 4), 3)
                 pygame.draw.circle(screen, (255, 255, 255), (gx + 4, gy - 4), 3)
-        hud = font.render(f"Score {self.score}   Lives {self.lives}   R = reset", True, (240, 240, 240))
+        hud = font.render(f"Score {self.score} Lives {self.lives} R = reset", True, hud_color())
         screen.blit(hud, (8, ROWS * TILE + 6))
         if self.state != "play":
             text = "YOU WIN! Press R" if self.state == "win" else "GAME OVER - Press R"
